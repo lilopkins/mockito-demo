@@ -1,6 +1,7 @@
 package uk.hpkns.mockitodemo;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -30,7 +31,7 @@ public class WhyMockitoTests {
 
         purchase.setPaid(true);
         // Now that we've paid, the shop wants to keep a copy of the purchase in the database.
-        // Just `dataRepository.save(purchase);`, right???
+        // Just `dataRepository.savePurchase(purchase);`, right???
         // Not quite, at the moment that will cause an error.
         assertThrows(Database.YepTheDatabaseStillIsntThereException.class, () -> dataRepository.savePurchase(purchase));
 
@@ -40,11 +41,11 @@ public class WhyMockitoTests {
     @Test
     void testSavingATransaction() {
         // In order to test that we can save it, we need to understand just a little about our save function.
-        // At the moment, it looks like this:
+        // At the moment, it looks something like this:
         /*
-            public void save(Product p) {
+            public void saveProduct(Product p) {
                 // Some database function to save the data...
-                saveThing(p);
+                database.save(p);
             }
          */
         // Ah! Maybe we can check if the saveThing() method ever is sent our purchase... this is where Mockito comes in!
@@ -72,4 +73,40 @@ public class WhyMockitoTests {
 
         // You can use verify() with any method, as long as it's something that you have asked Mockito to mock.
     }
+
+    @Test
+    void testArgumentCaptors() {
+        // Sometimes, we don't know exactly what has been passed to a method, but we still need to do some testing with
+        // it. For example, let's introduce a lottery machine [always gamble responsibly ;)] to our shop.
+        LotteryMachine lotteryMachine = new LotteryMachine();
+
+        // Lets start a purchase now:
+        Purchase purchase = new Purchase();
+        purchase.add(apples);
+        purchase.add(bananas);
+
+        // And lets add our ticket. Our lottery machine needs access to the database, so we'll mock that as well:
+        Database database = mock(Database.class);
+        DataRepository dataRepository = new DataRepository(database);
+        Product ticket = lotteryMachine.buyLotteryTicket(dataRepository);
+        purchase.add(ticket);
+
+        // We really want to check that the ticket we've added to our purchase was also correctly saved to the database.
+        // Ticket barcodes from this machine start with 991, followed by the 6 ticket numbers. We can use an
+        // ArgumentCaptor to get the ticket number as it was sent to the database.
+        ArgumentCaptor<Integer> ticketNumberCaptor = ArgumentCaptor.forClass(Integer.class);
+
+        // We capture the number that was sent using the same verify method as before
+        verify(database).save(ticketNumberCaptor.capture());
+
+        // But now we can access the ticket number
+        int ticketNumber = ticketNumberCaptor.getValue();
+
+        // Hopefully, it matches our ticket.
+        int ourTicket = ticket.getBarcode() - 991000000;
+        assertEquals(ourTicket, ticketNumber, "the ticket number should match what would be going into the database");
+    }
+
+    // Mockito has a lot more to offer. Once you're comfortable with the `mock()` and `verify()` methods, and the
+    // `ArgumentCaptor`, it is worth browsing the documentation to learn more about it.
 }

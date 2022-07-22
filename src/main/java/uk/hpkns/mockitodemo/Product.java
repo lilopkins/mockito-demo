@@ -15,4 +15,8 @@ public class Product {
     public float getPrice() {
         return price;
     }
+
+    public int getBarcode() {
+        return barcode;
+    }
 }
